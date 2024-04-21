@@ -33,7 +33,7 @@ pip install milkcow
 
 ## Usage
 ### Program 1
-```
+```python
 from milkcow import MilkCow
 
 mc = MilkCow(Record)  # provide a model
@@ -46,7 +46,7 @@ sender.send()  # send the data to a receiver
 You can create a receiver that will receive and hold objects if you go to another
 program in the same working directory.
 
-```
+```python
 from milkcow import Receiver
 
 receiver = Receiver(Record)  # create a receiver
@@ -81,7 +81,7 @@ custom class which implements a dump method.
 
 
 ### Import and Initialize
-```
+```python
 from my_model_class import Record
 from milkcow import MilkCow
 
@@ -93,7 +93,7 @@ mc = MilkCow(Record)
 Use connect to connect with an existing sqlite database, or if a database
 doesn't exist, one will be created at the path provided. If no path is given,
 milkcow will use mc.db.
-```
+```python
 mc.connect()
 output: MilkCow(...) -> datastore({0...0: [...]}) 0  # empty cow
 ```
@@ -106,7 +106,7 @@ We'll need to create a list of objects of the same type that we provided when
 creating MilkCow. Along with the list of objects we also need to specify a unique
 key. Milkcow is a simple key-value store and only understands keys and lists.
 
-```
+```python
 # pseudocode
 BR = [Record(**{...})] * 80_000
 AR = [Record(**{...})] * 80_000
@@ -129,7 +129,7 @@ much later...
 When milkcow is created, and connected, it won't pull data from the database on
 its own. Well need to to specify what data to pull by providing the data's key.
 
-```
+```python
 mc = MilkCow(Record) # new milkcow
 mc.connect()
 output: MilkCow(...) -> datastore({0...0: [...]}) 0
@@ -157,7 +157,7 @@ milkcow since the last sender was created we must call milkcow's get_sender
 method. Once sender has sent the data, sender will empty its buffer. To send
 new data, you will need to get a new sender by calling get_sender again. Senders
 only sting once. Much like the bee, a bug.
-```
+```python
 sender = mc.get_sender()
 output: SocketTransmitter(...) -> datastore({0...2: [...]}) 160,000
 # sender is loaded with milkcows data
@@ -171,7 +171,7 @@ multiprocessing so that we can send the sender to another process and have
 sender send its data back to the receiver in the main process. The receiver now
 has milkcow's data in the form of objects.
 
-```
+```python
 from milkcow import Receiver
 from multiprocessing import Process
 
@@ -197,7 +197,7 @@ JSON.
 ## Full Example Code
 
 ### example 1) adding objects
-```
+```python
 from milkcow.test.example.my_model_class import Record
 from milkcow import MilkCow
 
@@ -205,14 +205,14 @@ from milkcow import MilkCow
 BOB = [Record(**{'name': 'Bob', 'score': 1, 'game': 15})] * 80_000
 ALICE = [Record(**{'name': 'Alice', 'score': 1, 'game': 15})] * 80_000
 
-conn = MilkCow(Record)
-conn.connect(path='test-mc.db')
-conn.push('Bob', BOB)
-conn.push('Alice', ALICE)
+mc = MilkCow(Record)
+mc.connect(path='test-mc.db')
+mc.push('Bob', BOB)
+mc.push('Alice', ALICE)
 
 ```
 ### example 2) sending and receiving
-```
+```python
 from milkcow.test.example.my_model_class import Record
 from milkcow import MilkCow, Receiver
 from multiprocessing import Process
@@ -237,7 +237,7 @@ receiver.recv()
 ```
 
 ### example model) my_model_class
-```
+```python
 import json
 
 
@@ -256,3 +256,4 @@ class Record:
 
     def dump(self):
         return json.dumps(self.__dict__)
+```
