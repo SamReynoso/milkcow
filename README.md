@@ -27,7 +27,9 @@ for pydantic and json using sqlite database files.
 - pre-testing
 
 ## Installation
-...
+```
+pip install milkcow
+```
 
 ## Usage
 ### Program 1
