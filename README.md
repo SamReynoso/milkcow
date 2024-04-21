@@ -10,13 +10,13 @@
 
 ## Description
 
-A Tool to building middleware for backing-up and for the multiprocessing of data
-for pydantic and json using sqlite database files.
+A tool for building middleware for backing-up and for the multiprocessing of data
+from pyda ntic and json using sqlite database files.
 
 ### Core Features
 - Creates database tables to store serialized python objects.
 - Updates long-lived processes by performing iterprocess communication.
-- Facilitates the ingesting of raw data from disparate sources and move the data
+- Facilitates the ingesting of raw data from disparate sources and moves the data
   to a destination for storage and analysis.
 - More to come
 
@@ -79,7 +79,6 @@ a model_dump_json method or a dump method. When trying to obtain a valid JSON
 string, milkcow will use either of these methods. For this example I'm using a
 custom class which implements a dump method.
 
-
 ### Import and Initialize
 ```python
 from my_model_class import Record
@@ -127,7 +126,7 @@ with the data transmission that happens afterwards. More about that later.
 much later...
 
 When milkcow is created, and connected, it won't pull data from the database on
-its own. Well need to to specify what data to pull by providing the data's key.
+its own. We'll need to to specify the data to pull by providing a key.
 
 ```python
 mc = MilkCow(Record) # new milkcow
@@ -143,20 +142,22 @@ output: MilkCow(...) -> datastore({0...1: [...]}) 80,000
 mc.pull('Alice')
 output: MilkCow(...) -> datastore({0...2: [...]}) 160,000
 ```
-Now that we're in sync with the database we can start adding more objects for
-Bob and Alice as we did before. But before we can do anything usful with the
-data we're going to need a way of turning the byte encodings back into objects.
+Now that we're in sync with the database we can keep add objects for
+Bob and Alice as we did before. When we're ready to start doing something useful
+with all this data we're going to need a way to turn the byte encodings back into
+objects.
 
-So far, we could have used the ObjectCow class rather than MilkCow. ObjectCow
-holds all its data as objects, but for this example we are going to use
-MilkCow's get_sender method to transmit data to a receiver in another process.
+Thus far, we could have opted for using the class ObjectCow rather than MilkCow.
+With ObjectCow, all the data stored as objects, but for this example we're going 
+with MilkCow and using its get_sender method to transmit to another process where
+we need the objects.
 
 ### Transmit
-To get a SocketTransmitter that is pre-loaded with all the new data that entered
-milkcow since the last sender was created we must call milkcow's get_sender
-method. Once sender has sent the data, sender will empty its buffer. To send
-new data, you will need to get a new sender by calling get_sender again. Senders
-only sting once. Much like the bee, a bug.
+To get a SocketTransmitter that is pre-loaded with all the new data that entered 
+the database we call milkcow's get_sender method. This call returns a
+SocketTransmitter instance with any new data from milkcow. After sender sends, it
+will empties its own buffer. You will need to get a new sender before sending
+again. Senders only sting once. Much like the bee, a bug.
 ```python
 sender = mc.get_sender()
 output: SocketTransmitter(...) -> datastore({0...2: [...]}) 160,000
@@ -168,8 +169,8 @@ in a program far away...
 
 Just kidding, we're going to do this in one file. We must import Process from
 multiprocessing so that we can send the sender to another process and have
-sender send its data back to the receiver in the main process. The receiver now
-has milkcow's data in the form of objects.
+sender send to the receiver in the main process. The receiver now has milkcow's
+data in the form of objects.
 
 ```python
 from milkcow import Receiver
@@ -189,10 +190,9 @@ output: Receiver(...) -> datastore({0...2: [...]}) 160,000
 ```
 
 ### Supported Models
-Milkcow works well with pydantic models, but it will also work with any class
-that can provide a valid JSON string representation of itself. At the moment
-it only works with pydantic or classes that have a dump method that returns
-JSON.
+Milkcow works well with pydantic models, but it also works with other classes that
+can provide a valid JSON string representation of themselves. At the moment it works
+with pydantic or classes that have a dump method that returns JSON.
 
 ## Full Example Code
 
@@ -239,7 +239,6 @@ receiver.recv()
 ### example model) my_model_class
 ```python
 import json
-
 
 class Record:
     name: str
