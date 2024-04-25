@@ -1,6 +1,9 @@
-from milkcow.main import (
+from milkcow.core import (
         MilkCow,
         ObjectCow,
+        JqCow,
+        SocketTransmitter,
         Receiver,
-        SocketTransmitter
+        GetSender,
+        milkcat
         )

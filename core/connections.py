@@ -1,133 +1,124 @@
-import sqlite3
-from typing import Optional
-
-from milkcow.common.basecacheddb import BaseCachedDB
-from milkcow.common.basestore import BaseStore
-from milkcow.common.transcode import BlobStore, ObjectStore
+import json
+from milkcow.common.basedb import TranscodedDb
+from milkcow.core.milkcat import milkcat
+from milkcow.core.senders import GetSender
 
 
-class BaseDB(BaseCachedDB):
-    def _connect(self):
-        '''Create database connection'''
-        self._conn = sqlite3.connect('mc.db')
-
-    def _prep_values_for_db(self, values: list) -> None:
-        '''In-place operation on values list. Returns None'''
-        del values
-        raise NotImplementedError
-
-    def _create_table(self, key: str):
-        '''Create a database with key'''
-        if key not in self._store.keys():
-            sql = f'''CREATE TABLE IF NOT EXISTS {key} (data TEXT NOT NULL)'''
-            self._conn.execute(sql)
-
-    def _push_by_key(self, cur, key, value) -> None:
-        '''Create sql statement and executes on passed cursor'''
-        assert type(value) is str, value
-        sql = f'''INSERT INTO {key} VALUES (?)'''
-        cur.execute(sql, [value])
-
-    def _pull_by_key(self, key: str):
-        '''Pull from database and return iterable'''
-        assert type(key) is str
-        sql = f'''SELECT * FROM {key}'''
+def model_dump_transcoder(values: list):
+    for i, obj in enumerate(values):
         try:
-            cur = self._conn.execute(sql)
-            items = [value[0] for value in cur.fetchall()]
-            return items
-        except sqlite3.OperationalError as e:
-            print(e)
-        return []
-
-    def _drop_by_key(self, key: str) -> None:
-        '''Drop table by key'''
-        sql = f'''DROP TABLE {key};'''
-        self._conn.execute(sql)
-
-    def connect(self, path: Optional[str] = None):
-        '''Create database connection'''
-        if path is None:
-            self._connect()
-        else:
-            self._conn = sqlite3.connect(path)
-
-
-class Db0(BaseDB):
-    ''' object -> str -> db
-                      -> byes -> store'''
-
-    def __init__(self, classmodel) -> None:
-        _store = BlobStore(classmodel)  # BlobStore string -> bytes'''
-        super().__init__(_store)
-
-    def _prep_values_for_db(self, values: list) -> None:
-        '''Take list of objects and return list of string'''
-        for i, obj in enumerate(values):
+            values[i] = obj.model_dump_json()
+        except Exception as e:
             try:
-                values[i] = obj.model_dump_json()
-            except Exception as e:
-                try:
-                    values[i] = obj.dump()
-                except Exception:
-                    raise e
+                values[i] = obj.dump()
+            except Exception as d:
+                print(d)
+                raise e
 
 
-class Db1(BaseDB):
+class ObjectCow(TranscodedDb):
     ''' object -> str -> db
                -> store'''
 
     def __init__(self, classmodel) -> None:
+        super().__init__()
         self.classmodel = classmodel
-        _store = BaseStore()  # BaseStore does not transcode'''
-        super().__init__(_store)
+
+    def _add_to_cache(self, key: str, values: list) -> None:
+        self._cache.extend(key, values)
 
     def _prep_values_for_db(self, values: list) -> None:
         '''Take list of objects and return list of string'''
-        for i, obj in enumerate(values):
-            assert isinstance(obj, self.classmodel)
-            values[i] = obj.model_dump_json()
+        model_dump_transcoder(values)
 
+    def _push_values_and_cache(self, key: str, values: list) -> None:
+        self._add_to_cache(key, values)
+        self._prep_values_for_db(values)
+        self._push_values(key, values)
 
-class Db2(BaseDB):
-    ''' str -> db
-            -> byes -> store'''
-
-    def __init__(self, classmodel) -> None:
-        _store = BlobStore(classmodel)  # BlobStore string -> bytes'''
-        super().__init__(_store)
-
-    def _prep_values_for_db(self, values: list) -> None:
-        '''bypass'''
-        x = len(values)
-        del x
-
-
-class Db3(BaseDB):
-    ''' str -> db
-            -> obj -> store'''
-
-    def __init__(self, classmodel) -> None:
-        _store = ObjectStore(classmodel)  # ObjectStore string -> objects
-        super().__init__(_store)
-
-    def _prep_values_for_db(self, values: list) -> None:
-        '''bypass do nothing'''
-        x = len(values)
-        del x
-
-
-class Db4(BaseDB):
-    ''' byets -> str -> db
-                     -> obj -> store'''
-    pass
-
-    def __init__(self, classmodel) -> None:
-        _store = ObjectStore(classmodel)  # ObjectStore string -> objects
-        super().__init__(_store)
-
-    def _prep_values_for_db(self, values: list) -> None:
-        '''Take list of bytes and do in place decode to string'''
+    def _pull_values_and_cache(self, key: str) -> list:
+        values = self._pull_by_key(key)
         for i, value in enumerate(values):
-            assert type(value) is bytes
-            values[i] = value.decode()
+            values[i] = self.classmodel(**json.loads(value))
+        self._add_to_cache(key, values)
+        return values
+
+    def __str__(self) -> str:
+        return f'ObjectCow(...) -> {self._cache}'
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+class MilkCow(TranscodedDb):
+    ''' object -> str -> db
+                      -> bytes -> store'''
+
+    def __init__(self, classmodel) -> None:
+        super().__init__()
+        self.classmodel = classmodel
+        self._cache = GetSender()
+        self.sender = self._cache
+
+    def _add_to_cache(self, key: str, values: list) -> None:
+        for i, value in enumerate(values):
+            values[i] = value.encode()
+        self._cache.extend(key, values)
+
+    def _prep_values_for_db(self, values: list) -> None:
+        model_dump_transcoder(values)
+
+    def _push_values_and_cache(self, key: str, values: list) -> None:
+        self._prep_values_for_db(values)
+        self._push_values(key, values)
+        self._add_to_cache(key, values)
+
+    def _pull_values_and_cache(self, key: str) -> list:
+        values = self._pull_by_key(key)
+        self._add_to_cache(key, values)
+        return values
+
+    def __str__(self) -> str:
+        return f'MilkCow(...) -> {self._cache}'
+
+    def __repr__(self) -> str:
+        return self.__str__()
+
+
+class JqCow(TranscodedDb):
+    ''' str -> db
+            -> store'''
+
+    def __init__(self, key_on: str) -> None:
+        super().__init__()
+        self.key_on = key_on
+
+    def _add_to_cache(self, key: str, values: list) -> None:
+        self._cache.extend(key, values)
+
+    def _push_values_and_cache(self, key: str, values: list) -> None:
+        self._push_values(key, values)
+        self._add_to_cache(key, values)
+
+    def _pull_values_and_cache(self, key: str) -> list:
+        values = self._pull_by_key(key)
+        self._add_to_cache(key, values)
+        return values
+
+    def push_raw_json(self, raw_json: str, ignore: bool = False) -> None:
+        pylist = milkcat.load(raw_json)
+        self.push_unkeyed(pylist, ignore)
+
+    def push_unkeyed(self, pylist: list, ignore: bool = False) -> None:
+        if ignore is True:
+            key_map = milkcat.map_by_key_ignore_missing(self.key_on, pylist)
+        else:
+            key_map = milkcat.map_by_key(self.key_on, pylist)
+        for k, v in key_map.items():
+            self.push(k, v)
+
+    def __str__(self) -> str:
+        return f'JqCow({self.key_on}) -> {self._cache}'
+
+    def __repr__(self) -> str:
+        return self.__str__()

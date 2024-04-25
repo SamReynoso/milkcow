@@ -6,237 +6,162 @@
     ██║ ╚═╝ ██║██║███████╗██║  ██╗╚██████╗╚██████╔╝╚███╔███╔╝
     ╚═╝     ╚═╝╚═╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝  ╚══╝╚══╝ 
 
-## v 0.0.01
+## v 0.0.11
 
 ## Description
 
-A tool for building middleware for backing-up and for the multiprocessing of data
-from pyda ntic and json using sqlite database files.
+A library for building middleware, local storage, and multiprocessing scripts
+from python and json data using sqlite database files.
+
+# Release Notes
+## Additions
+- milkcow - command line utility - A json segmentation tool.
+- JqCow - Creates database entries from raw json and key word.
+- ObjectCow - Creates database entries from python objects.
+- milkcat - The 'parser' used for milkcow's json segmentation.
+- GetSender - A SocketTransmitter factory.
 
 ### Core Features
-- Creates database tables to store serialized python objects.
-- Updates long-lived processes by performing iterprocess communication.
-- Facilitates the ingesting of raw data from disparate sources and moves the data
-  to a destination for storage and analysis.
-- More to come
-
-### Limitations
-- Only supports one model class (atm) per database.
-- You get one flavor of database query. Key -> list of objects
-- Very early in development. Everything is subject to change. Still naming things
-- pre-testing
+- Automatic database creation and in-memory key-value mapping.
+- Tracks the ingress of new objects.
+- Performs a single level parsing of json iterables.
 
 ## Installation
+
 ```
 pip install milkcow
 ```
 
 ## Usage
-### Program 1
+### From the command line
+The milkcow command line tool provides an easy way to test out milkcow. 
+Inspect milkcat's json segmentation key mapping, and push json directly to a
+database on the file system.
+
+```bash
+milkcow file.json name mc.db
+milkcow file.json name -t
+milkcow file.json -t
+
+cat file.json | milkcow name mc.db
+```
+
+Use the -t flag to view the segmentations output before key mapping.
+
+```bash
+
+milkcow file.json -t
+['{"This": "is", "type": "object"}', '{"This": "is", "type": "object"}',
+'{"a": "json", "type": "object"}', '{"list": "of", "type": "object"}',
+'{"type": "foo"}']
+
+```
+
+Use the -t flag to view the key mapping output without pushing to a database.
+
+```bash
+milkcow file.json type -t
+{'object': ['{"This": "is", "type": "object"}', '{"This": "is", "type": "object"}',
+            '{"a": "json", "type": "object"}', '{"list": "of", "type": "object"}'],
+'foo': ['{"type": "foo"}']}
+```
+
+## In a program
+### ObjectCow
+Creates database tables from python object. Performs simple fetch all operation
+and holds objects in memory.
+
 ```python
-from milkcow import MilkCow
+from milkcow import ObjectCow
 
-mc = MilkCow(Record)  # provide a model
-mc.push('Bob', list[Record])  # add new objects
-mc.pull('Alice)  # pull existing data by key
-sender = mc.get_sender()  # create a sender
-sender.send()  # send the data to a receiver
+oc = ObjectCow(Record)
+
+oc.push('Bob', records)
+obj = oc.new('Bob')
+
+oc.pull('Alice')
+obj = oc.new('Alice')
+
+k, v = oc.items()
+
+for k in oc.keys()
+    new = oc.new(k)
 ```
-### Program 2
-You can create a receiver that will receive and hold objects if you go to another
-program in the same working directory.
+
+### MilkCow
+The MilkCow holds bytes for further transmission rather than holding python
+objects.
 
 ```python
-from milkcow import Receiver
-
-receiver = Receiver(Record)  # create a receiver
-receiver.recv() # receive data as model objects
-```
-You can do the same thing in the python interpreter.
-```
-> receiver.recv()
-> 
-> len(receiver)
-> 2
->
-> for k, v in receiver.items():
->     print(k, len(v))
-> Bob 80000
-> Alice 80000
->
-> receiver.getsizeof()
-> 160000
->
-> receiver['Jim']
-> []
-
-```
-
-## Examples
-
-To get the most from milkcow you need a pydantic model or a class with either
-a model_dump_json method or a dump method. When trying to obtain a valid JSON
-string, milkcow will use either of these methods. For this example I'm using a
-custom class which implements a dump method.
-
-### Import and Initialize
-```python
-from my_model_class import Record
 from milkcow import MilkCow
 
 mc = MilkCow(Record)
-
-```
-
-### Connect
-Use connect to connect with an existing sqlite database, or if a database
-doesn't exist, one will be created at the path provided. If no path is given,
-milkcow will use mc.db.
-```python
-mc.connect()
-output: MilkCow(...) -> datastore({0...0: [...]}) 0  # empty cow
-```
-We are currently connected, but milkcow as yet has no data. We need to create
-some data before we get started. Later we'll walk through pulling data from an
-existing database.
-
-### Push
-We'll need to create a list of objects of the same type that we provided when
-creating MilkCow. Along with the list of objects we also need to specify a unique
-key. Milkcow is a simple key-value store and only understands keys and lists.
-
-```python
-# pseudocode
-BR = [Record(**{...})] * 80_000
-AR = [Record(**{...})] * 80_000
-
-# push bob and alice
-mc.push('Bob', BR)
-mc.push('Alice', AR)
-
-# outputs after each call to push
-output: MilkCow(...) -> datastore({0...1: [...]}) 80,000
-output: MilkCow(...) -> datastore({0...2: [...]}) 160,000
-```
-Pushing to the database also stores the data inside milkcow. But we can't use it
-yet because it's not stored as python objects. Rather, it's bytes. This helps
-with the data transmission that happens afterwards. More about that later.
-
-### Pull
-much later...
-
-When milkcow is created, and connected, it won't pull data from the database on
-its own. We'll need to to specify the data to pull by providing a key.
-
-```python
-mc = MilkCow(Record) # new milkcow
-mc.connect()
-output: MilkCow(...) -> datastore({0...0: [...]}) 0
-output: MilkCow(...) -> datastore({0...0: [...]}) 0
-
-
 mc.pull('Bob')
-output: MilkCow(...) -> datastore({0...1: [...]}) 80,000
+mc.push('Alice', list[Record])
 
-
-mc.pull('Alice')
-output: MilkCow(...) -> datastore({0...2: [...]}) 160,000
+sender = mc.sender.new_sender()
+sender = mc.sender.all_sender()
+sender = mc.sender.keyed_sender('Alice')
+sender.send()
 ```
-Now that we're in sync with the database we can keep add objects for
-Bob and Alice as we did before. When we're ready to start doing something useful
-with all this data we're going to need a way to turn the byte encodings back into
-objects.
 
-Thus far, we could have opted for using the class ObjectCow rather than MilkCow.
-With ObjectCow, all the data stored as objects, but for this example we're going 
-with MilkCow and using its get_sender method to transmit to another process where
-we need the objects.
+Use the Receiver class to receive from a sender.
 
-### Transmit
-To get a SocketTransmitter that is pre-loaded with all the new data that entered 
-the database we call milkcow's get_sender method. This call returns a
-SocketTransmitter instance with any new data from milkcow. After sender sends, it
-will empties its own buffer. You will need to get a new sender before sending
-again. Senders only sting once. Much like the bee, a bug.
+### JqCow
+JqCow works with only raw strings, and has 2 additions to the other cow
+classes.
+
 ```python
-sender = mc.get_sender()
-output: SocketTransmitter(...) -> datastore({0...2: [...]}) 160,000
-# sender is loaded with milkcows data
+jc = JqCow('name')
+jc.pull('Bob')
+jc.push('Alice', records)
+jc.push('Bob', records)
+
+jc.push_unkeyed(records)
+jc.push_raw_json(raw_json_list_of_objects)
 ```
 
-### Receive
-in a program far away...
+JqCow uses the milkcat module to try to chunk raw json into a list of 'top
+level json objects.'
 
-Just kidding, we're going to do this in one file. We must import Process from
-multiprocessing so that we can send the sender to another process and have
-sender send to the receiver in the main process. The receiver now has milkcow's
-data in the form of objects.
+### milkcat
+
+```python
+from milkcow import milkcat
+
+milkcat.load(raw_json_list_of_objects)
+milkcat.dump(pylist_of_strings)
+```
+
+### Receiver
+in a program far away...
 
 ```python
 from milkcow import Receiver
-from multiprocessing import Process
+from  milkcow import SocketTransmitter
 
-sender = mc.get_sender()
-receiver = Receiver(Record)
-output: SocketTransmitter(...) -> datastore({0...2: [...]}) 160,000
-output: Receiver(...) -> datastore({0...0: [...]}) 0
-
-p = Process(target=sender.send, args=())
-p.start()
+receiver = Receiver()
 receiver.recv()
+receiver.recv_model(Record)
+receiver.new()
+receiver.items()
+receiver.keys()
+receiver.values()
+len(receiver)
+receiver.getsizeof()
+receiver['Bob']
 
-output: SocketTransmitter(...) -> datastore({0...0: [...]}) 0 
-output: Receiver(...) -> datastore({0...2: [...]}) 160,000
+receiver = Receiver(Record)
+receiver.recv_model()
 ```
 
 ### Supported Models
-Milkcow works well with pydantic models, but it also works with other classes that
-can provide a valid JSON string representation of themselves. At the moment it works
-with pydantic or classes that have a dump method that returns JSON.
+Milkcow works well with pydantic models, but it also works with other classes
+that can provide a valid json string. At the moment it works with pydantic or
+classes that have a dump method that returns json.
 
-## Full Example Code
+This is the Record class used in all example code in this document.
 
-### example 1) adding objects
-```python
-from milkcow.test.example.my_model_class import Record
-from milkcow import MilkCow
-
-
-BOB = [Record(**{'name': 'Bob', 'score': 1, 'game': 15})] * 80_000
-ALICE = [Record(**{'name': 'Alice', 'score': 1, 'game': 15})] * 80_000
-
-mc = MilkCow(Record)
-mc.connect(path='test-mc.db')
-mc.push('Bob', BOB)
-mc.push('Alice', ALICE)
-
-```
-### example 2) sending and receiving
-```python
-from milkcow.test.example.my_model_class import Record
-from milkcow import MilkCow, Receiver
-from multiprocessing import Process
-
-
-receiver = Receiver(Record)
-mc = MilkCow(Record)
-
-mc.connect(path='test-mc.db')
-mc.pull('Bob')
-sender = mc.get_sender()
-
-p = Process(target=sender.send, args=())
-p.start()
-receiver.recv()
-
-mc.pull('Alice')
-sender = mc.get_sender()
-p = Process(target=sender.send, args=())
-p.start()
-receiver.recv()
-```
-
-### example model) my_model_class
 ```python
 import json
 
@@ -256,3 +181,4 @@ class Record:
     def dump(self):
         return json.dumps(self.__dict__)
 ```
+

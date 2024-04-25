@@ -13,7 +13,7 @@ class BaseBuffedSocket:
         self._path = 'socket'
 
     def _close(self, uni: socket.socket) -> None:
-        '''close socket'''
+        '''Close socket'''
         uni.close()
         try:
             os.unlink(self._path)
@@ -22,7 +22,7 @@ class BaseBuffedSocket:
                 raise OSError
 
     def _bind(self) -> socket.socket:
-        '''creates socket'''
+        '''Creates socket'''
         try:
             os.unlink(self._path)
         except OSError:
@@ -66,7 +66,7 @@ class BaseBuffedSocket:
         uni.send('done'.encode())
 
     def _recv_buffer(self, uni: socket.socket) -> bool:
-        '''accumulates sent messages'''
+        '''Accumulates sent messages'''
         msg = uni.recv(1024).decode()
         buffer = []
         if msg == 'pad_end':
